@@ -86,7 +86,7 @@ def build_golden_set(con: duckdb.DuckDBPyConnection, max_per_rule: int = 10) -> 
                     ),
                     "min_attribution_coverage_if_ready": 0.90,
                     "typology_hypothesis_should_be_specific": bool(r.gt_label),
-                    "compliance_must_pass": True,
+                    "compliance_must_pass": True,  # nosec B105 - bool value, key name coincidentally contains "pass"
                 },
             }
         )

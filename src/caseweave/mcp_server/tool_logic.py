@@ -88,17 +88,23 @@ def search_typology(query: str, k: int = 3) -> list[dict]:
     return search(query, k=k)
 
 
+def _count(con: duckdb.DuckDBPyConnection, sql: str) -> int:
+    row = con.execute(sql).fetchone()
+    assert row is not None, f"COUNT query returned no row: {sql!r}"
+    return row[0]
+
+
 def get_queue_summary(con: duckdb.DuckDBPyConnection) -> dict:
     """High-level queue stats — the kind of question a BSA officer asks
     first thing in the morning."""
-    total = con.execute("SELECT count(*) FROM alerts").fetchone()[0]
+    total = _count(con, "SELECT count(*) FROM alerts")
     by_rule = con.execute(
         "SELECT rule_code, rule_name, count(*) AS n FROM alerts GROUP BY 1, 2 ORDER BY 1"
     ).fetchdf()
     by_status = con.execute("SELECT status, count(*) AS n FROM alerts GROUP BY 1").fetchdf()
-    tp = con.execute("SELECT count(*) FROM alerts WHERE gt_label").fetchone()[0]
-    n_tx = con.execute("SELECT count(*) FROM transactions").fetchone()[0]
-    n_parties = con.execute("SELECT count(*) FROM parties").fetchone()[0]
+    tp = _count(con, "SELECT count(*) FROM alerts WHERE gt_label")
+    n_tx = _count(con, "SELECT count(*) FROM transactions")
+    n_parties = _count(con, "SELECT count(*) FROM parties")
     return {
         "total_alerts": total,
         "by_rule": by_rule.to_dict("records"),

@@ -64,6 +64,8 @@ split-on-trailing-comma = false
 "src/caseweave/scoring/rules.py" = ["S608"]  # SQL is f-string built from config constants, never user input
 "scripts/verify_day2.py" = ["S603", "S607"]  # subprocess call is a fixed, hardcoded pytest invocation
 "scripts/doctor.py" = ["S603", "S607"]  # subprocess calls are fixed, hardcoded docker/npm invocations
+"src/caseweave/agents/tools.py" = ["BLE001"]  # every broad except is a deliberate degrade-gracefully catch: a store outage means less evidence, not a crash
+"src/caseweave/observability/tracing.py" = ["BLE001"]  # tracing must never be able to take the app down; any failure here is deliberately caught broadly
 
 [tool.mypy]
 python_version = "3.12"
@@ -78,6 +80,20 @@ addopts = "-q --strict-markers"
 
 [tool.bandit]
 exclude_dirs = ["tests"]
+skips = [
+    "B101",  # assert is used deliberately throughout for graph-state
+             # invariant narrowing (the same pattern mypy's own errors
+             # pointed to) and for internal test assertions. Never used to
+             # enforce a security boundary against untrusted input.
+    "B608",  # every f-string SQL query in this codebase is built from
+             # internal config constants (RULE_*_THRESHOLD etc.) or an
+             # allowlisted table-name helper (db/duck.py's TABLES
+             # frozenset + _checked()) — never from user-supplied input.
+             # Reviewed per-instance. ruff's matching S608 rule is already
+             # suppressed for the same reason via per-file-ignores above;
+             # bandit does not read ruff's noqa comments, so it needs this
+             # explicit, separately-documented skip.
+]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = true

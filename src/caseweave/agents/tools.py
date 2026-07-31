@@ -167,7 +167,7 @@ def load_network_context(ledger: EvidenceLedger, account_id: str, limit: int = 8
     ) as span:
         try:
             from caseweave.db.graph import run_template
-        except Exception:  # noqa: BLE001 - degrade gracefully, any store outage means less evidence not a crash
+        except Exception:  # degrade gracefully, any store outage means less evidence not a crash (BLE001 suppressed file-wide, see pyproject.toml)
             logger.warning("neo4j driver unavailable, skipping network context for %s", account_id)
             span.set_attribute("graph_available", False)
             return []
@@ -187,7 +187,7 @@ def load_network_context(ledger: EvidenceLedger, account_id: str, limit: int = 8
                 )
             span.set_attribute("graph_available", True)
             span.set_attribute("n_counterparties", len(out))
-        except Exception:
+        except Exception:  # degrade gracefully, any store outage means less evidence not a crash (BLE001 suppressed file-wide, see pyproject.toml)
             logger.warning(
                 "graph query failed for account %s, evidence is incomplete",
                 account_id,
@@ -222,7 +222,7 @@ def load_prior_dispositions(
                    ORDER BY decided_at DESC LIMIT 5""",
                 [party_id, exclude_alert_id],
             ).fetchall()
-        except Exception:
+        except Exception:  # degrade gracefully, table may not exist yet on an older DB file (BLE001 suppressed file-wide, see pyproject.toml)
             logger.warning(
                 "dispositions table unavailable, no prior-disposition memory", exc_info=True
             )
@@ -259,7 +259,7 @@ def load_typology_matches(ledger: EvidenceLedger, query: str, k: int = 3):
     with logfire.span("tool.load_typology_matches", query=query, k=k) as span:
         try:
             from caseweave.corpus.loader import search
-        except Exception:  # noqa: BLE001 - degrade gracefully, any store outage means less evidence not a crash
+        except Exception:  # degrade gracefully, any store outage means less evidence not a crash (BLE001 suppressed file-wide, see pyproject.toml)
             logger.warning("pgvector unavailable, skipping typology retrieval for query %r", query)
             span.set_attribute("corpus_available", False)
             return []
@@ -293,7 +293,7 @@ def load_typology_matches(ledger: EvidenceLedger, query: str, k: int = 3):
                 )
             span.set_attribute("corpus_available", True)
             span.set_attribute("n_chunks_retrieved", len(out))
-        except Exception:  # noqa: BLE001 - degrade gracefully, any store outage means less evidence not a crash
+        except Exception:  # degrade gracefully, any store outage means less evidence not a crash (BLE001 suppressed file-wide, see pyproject.toml)
             logger.warning("corpus search failed for query %r, evidence is incomplete", query)
             span.set_attribute("corpus_available", True)
             span.set_attribute("query_error", True)

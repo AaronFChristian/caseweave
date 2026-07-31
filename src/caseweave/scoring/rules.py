@@ -175,8 +175,8 @@ def _to_alerts(
     )
 
     out: list[Alert] = []
-    for i, row in enumerate(df.itertuples(index=False), start=start_idx):
-        acc = row.acc
+    for i, rec in enumerate(df.to_dict("records"), start=start_idx):
+        acc = rec["acc"]
         party = acc_party.get(acc)
         if party is None:
             continue
@@ -189,12 +189,12 @@ def _to_alerts(
                 subject_account_id=acc,
                 rule_code=code,
                 rule_name=RULES[code],
-                trigger_reason=reason_fn(row),
+                trigger_reason=reason_fn(rec),
                 anomaly_score=round(scores.get(acc, 0.0), 4),
-                window_start=pd.Timestamp(row.ws).to_pydatetime(),
-                window_end=pd.Timestamp(row.we).to_pydatetime(),
-                tx_count=int(row.n),
-                total_amount=float(row.total),
+                window_start=pd.Timestamp(rec["ws"]).to_pydatetime(),
+                window_end=pd.Timestamp(rec["we"]).to_pydatetime(),
+                tx_count=int(rec["n"]),
+                total_amount=float(rec["total"]),
                 gt_label=typ != Typology.NONE.value,
                 gt_typology=Typology(typ),
             )
@@ -205,7 +205,7 @@ def _to_alerts(
 def run_rules(
     con: duckdb.DuckDBPyConnection, account_scores: dict[str, float], use_graph: bool = True
 ) -> list[Alert]:
-    alerts: list[Alert] = []
+    alerts: list[list[Alert]] = []
     idx = 1
 
     specs = [
@@ -213,10 +213,10 @@ def run_rules(
             "R001",
             _SQL_STRUCTURING,
             lambda r: _REASON["R001"].format(
-                n=int(r.n),
+                n=int(r["n"]),
                 floor=cfg.RULE_STRUCTURING_FLOOR,
                 ctr=cfg.CTR_THRESHOLD,
-                total=r.total,
+                total=r["total"],
                 days=cfg.RULE_STRUCTURING_WINDOW_DAYS,
             ),
         ),
@@ -224,17 +224,20 @@ def run_rules(
             "R002",
             _SQL_PASSTHROUGH,
             lambda r: _REASON["R002"].format(
-                n=int(r.n),
+                n=int(r["n"]),
                 pct=cfg.RULE_PASSTHROUGH_RATIO * 100,
                 hrs=cfg.RULE_PASSTHROUGH_HOURS,
-                total=r.total,
+                total=r["total"],
             ),
         ),
         (
             "R003",
             _SQL_FANIN,
             lambda r: _REASON["R003"].format(
-                senders=int(r.senders), days=cfg.RULE_FANIN_WINDOW_DAYS, n=int(r.n), total=r.total
+                senders=int(r["senders"]),
+                days=cfg.RULE_FANIN_WINDOW_DAYS,
+                n=int(r["n"]),
+                total=r["total"],
             ),
         ),
         (
@@ -242,12 +245,12 @@ def run_rules(
             _SQL_DORMANT,
             lambda r: _REASON["R004"].format(
                 quiet=cfg.RULE_DORMANT_QUIET_DAYS,
-                total=r.total,
-                n=int(r.n),
+                total=r["total"],
+                n=int(r["n"]),
                 mult=cfg.RULE_DORMANT_MULTIPLE,
             ),
         ),
-        ("R005", _SQL_CORRIDOR, lambda r: _REASON["R005"].format(n=int(r.n), total=r.total)),
+        ("R005", _SQL_CORRIDOR, lambda r: _REASON["R005"].format(n=int(r["n"]), total=r["total"])),
     ]
 
     for code, sql, reason_fn in specs:
@@ -268,7 +271,7 @@ def run_rules(
                 con,
                 df,
                 "R006",
-                lambda r: _REASON["R006"].format(hops=int(r.n), total=r.total),
+                lambda r: _REASON["R006"].format(hops=int(r["n"]), total=r["total"]),
                 account_scores,
                 idx,
             )

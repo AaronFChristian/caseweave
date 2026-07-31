@@ -139,5 +139,7 @@ def insert_disposition(
 def counts(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
     out = {}
     for t in sorted(TABLES):
-        out[t] = con.execute(f"SELECT count(*) FROM {_checked(t)}").fetchone()[0]  # noqa: S608
+        row = con.execute(f"SELECT count(*) FROM {_checked(t)}").fetchone()  # noqa: S608
+        assert row is not None, f"COUNT(*) on {t} returned no row — should be impossible"
+        out[t] = row[0]
     return out

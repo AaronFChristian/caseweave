@@ -48,7 +48,11 @@ def triage_recognised_signal(case: dict, typology_hypothesis: str | None) -> Met
     non-trivial hypothesis rather than 'none' or empty."""
     if not case["expectations"]["typology_hypothesis_should_be_specific"]:
         return MetricResult("triage_recognised_signal", True, "n/a (ground-truth negative)")
-    ok = bool(typology_hypothesis) and typology_hypothesis.lower() not in ("none", "unknown", "")
+    ok = typology_hypothesis is not None and typology_hypothesis.lower() not in (
+        "none",
+        "unknown",
+        "",
+    )
     return MetricResult(
         "triage_recognised_signal", ok, f"typology_hypothesis={typology_hypothesis!r}"
     )

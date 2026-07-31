@@ -40,7 +40,10 @@ def drain_topic(expected: int, timeout: float = 30.0) -> pd.DataFrame:
                 raise KafkaException(msg.error())
             idle = 0.0
             try:
-                rec = json.loads(msg.value())
+                raw = msg.value()
+                if raw is None:
+                    raise ValueError("message has a null value (e.g. a tombstone record)")
+                rec = json.loads(raw)
                 if rec["tx_id"] in seen:  # idempotent replay
                     continue
                 seen.add(rec["tx_id"])

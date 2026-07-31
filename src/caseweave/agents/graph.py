@@ -115,6 +115,8 @@ def node_manual_only(state: CaseState) -> CaseState:
 def node_triage(
     state: CaseState, con: duckdb.DuckDBPyConnection, use_cache: bool = True
 ) -> CaseState:
+    assert state.alert is not None, "triage reached without load_alert having run"
+    assert state.subject_party_id is not None
     ledger = ledger_for(state.case_id)
     cost_ledger = cost_ledger_for(state.case_id)
     kyc = tools.load_subject_kyc(con, ledger, state.subject_party_id)
@@ -125,6 +127,7 @@ def node_triage(
 
 
 def route_after_triage(state: CaseState) -> str:
+    assert state.alert is not None
     wants_close = bool(state.triage and state.triage.recommended_route == "close")
     level = state.autonomy_level
 
@@ -148,6 +151,7 @@ def node_auto_close(state: CaseState) -> CaseState:
     """L4 only, and re-validated here (not just trusted from the routing
     decision) — defense in depth in case config or eval evidence changed
     between routing and execution."""
+    assert state.alert is not None, "auto_close reached without load_alert having run"
     eligible, reason = is_eligible_for_autonomous_close(
         state.alert["rule_code"], state.autonomy_level
     )
@@ -169,6 +173,9 @@ def node_evidence_only(state: CaseState, con: duckdb.DuckDBPyConnection) -> Case
     """L1, triage recommends investigating: assemble evidence and stop.
     No narrative is ever drafted at L1 — that is the entire point of the
     level. A human drafts manually from the assembled ledger."""
+    assert state.alert is not None
+    assert state.triage is not None
+    assert state.subject_party_id is not None
     ledger = ledger_for(state.case_id)
     tools.load_subject_transactions(con, ledger, state.alert)
     tools.load_network_context(ledger, state.alert["subject_account_id"])
@@ -181,6 +188,9 @@ def node_evidence_only(state: CaseState, con: duckdb.DuckDBPyConnection) -> Case
 
 
 def node_gather_evidence(state: CaseState, con: duckdb.DuckDBPyConnection) -> CaseState:
+    assert state.alert is not None
+    assert state.triage is not None
+    assert state.subject_party_id is not None
     ledger = ledger_for(state.case_id)
     tools.load_subject_transactions(con, ledger, state.alert)
     tools.load_network_context(ledger, state.alert["subject_account_id"])
@@ -211,6 +221,7 @@ def node_draft_narrative(state: CaseState, use_cache: bool = True) -> CaseState:
 
 
 def node_guardrail_gate(state: CaseState, use_cache: bool = True) -> CaseState:
+    assert state.narrative_text is not None, "guardrail_gate reached before draft_narrative ran"
     ledger = ledger_for(state.case_id)
     cost_ledger = cost_ledger_for(state.case_id)
     attr = validate(state.narrative_text, ledger, cost_ledger, use_cache=use_cache)

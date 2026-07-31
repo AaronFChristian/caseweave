@@ -17,8 +17,12 @@ import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from caseweave import config as cfg
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 DDL = f"""
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -103,7 +107,7 @@ def chunk_dir(path: Path | None = None) -> list[Chunk]:
     return chunks
 
 
-_MODEL_CACHE: dict[str, SentenceTransformer] = {}  # noqa: F821 - type imported lazily below
+_MODEL_CACHE: dict[str, SentenceTransformer] = {}
 
 
 def _get_model():

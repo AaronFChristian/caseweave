@@ -71,7 +71,7 @@ def configure_logfire() -> None:
         # by a human.
         logfire.instrument_pydantic(record="failure")
         _configured = True
-    except Exception:
+    except Exception:  # tracing must never be able to take the app down, any failure here is caught (BLE001 suppressed file-wide, see pyproject.toml)
         # Tracing must never be able to take the application down. A
         # misconfigured token or a network hiccup during configure() is a
         # degraded-observability problem, not an application-down problem.

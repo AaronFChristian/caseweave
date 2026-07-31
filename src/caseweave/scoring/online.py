@@ -22,17 +22,17 @@ from river import anomaly, preprocessing
 from caseweave import config as cfg
 
 
-def _features(row, hist: deque, prev_ts: datetime | None) -> dict[str, float]:
+def _features(rec: dict, hist: deque, prev_ts: datetime | None) -> dict[str, float]:
     amounts = list(hist)
-    mean = sum(amounts) / len(amounts) if amounts else row.amount
+    mean = sum(amounts) / len(amounts) if amounts else rec["amount"]
     return {
-        "log_amount": math.log1p(row.amount),
-        "hour": float(row.ts.hour),
-        "is_cash": 1.0 if row.is_cash else 0.0,
-        "is_cross_border": 1.0 if row.is_cross_border else 0.0,
+        "log_amount": math.log1p(rec["amount"]),
+        "hour": float(rec["ts"].hour),
+        "is_cash": 1.0 if rec["is_cash"] else 0.0,
+        "is_cross_border": 1.0 if rec["is_cross_border"] else 0.0,
         "velocity_24h": float(len(amounts)),
-        "amount_ratio": float(row.amount / mean) if mean > 0 else 1.0,
-        "gap_hours": float((row.ts - prev_ts).total_seconds() / 3600.0) if prev_ts else 0.0,
+        "amount_ratio": float(rec["amount"] / mean) if mean > 0 else 1.0,
+        "gap_hours": float((rec["ts"] - prev_ts).total_seconds() / 3600.0) if prev_ts else 0.0,
     }
 
 
@@ -55,21 +55,21 @@ def score_stream(tx_df: pd.DataFrame) -> tuple[dict[str, float], dict[str, float
     tx_scores: dict[str, float] = {}
     acc_scores: dict[str, float] = defaultdict(float)
 
-    for row in tx_df.itertuples(index=False):
-        acc = row.src_account_id or row.dst_account_id
+    for rec in tx_df.to_dict("records"):
+        acc = rec["src_account_id"] or rec["dst_account_id"]
         if acc is None:
             continue
         window = hist[acc]
-        x = _features(row, window, last_ts.get(acc))
+        x = _features(rec, window, last_ts.get(acc))
 
         score = float(model.score_one(x))
         model.learn_one(x)
 
-        tx_scores[row.tx_id] = score
+        tx_scores[rec["tx_id"]] = score
         if score > acc_scores[acc]:
             acc_scores[acc] = score
 
-        window.append(row.amount)
-        last_ts[acc] = row.ts
+        window.append(rec["amount"])
+        last_ts[acc] = rec["ts"]
 
     return tx_scores, dict(acc_scores)
