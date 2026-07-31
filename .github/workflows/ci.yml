@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push: {branches: [main]}
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: caseweave
+          POSTGRES_PASSWORD: caseweave_dev
+          POSTGRES_DB: caseweave
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U caseweave"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: {enable-cache: true}
+      - run: uv sync --all-extras
+
+      - name: lint
+        run: |
+          uv run ruff check src scripts tests
+          uv run ruff format --check src scripts tests
+
+      - name: types
+        run: uv run mypy src
+
+      - name: security
+        run: |
+          uv run bandit -q -r src -c pyproject.toml
+          uv run pip-audit --strict
+
+      - name: tests
+        run: uv run pytest --cov=caseweave --cov-report=term-missing --cov-fail-under=60
+
+      # The pipeline must reproduce identically from the seed. Drift here means
+      # an eval baseline is about to become meaningless without anyone noticing.
+      - name: day 1 reproducibility gate
+        env:
+          POSTGRES_DSN: postgresql://caseweave:caseweave_dev@localhost:5432/caseweave
+        run: |
+          uv run python scripts/pipeline.py all --direct --no-graph
+          uv run python scripts/verify_day1.py
+
+  # Day 3 adds the gate that blocks merges on faithfulness regression:
+  # evals:
+  #   needs: quality
+  #   run: uv run python scripts/run_evals.py --fail-under-faithfulness 0.90

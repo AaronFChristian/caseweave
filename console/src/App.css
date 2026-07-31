@@ -1,0 +1,622 @@
+/* ===========================================================
+   CaseWeave — design tokens
+   Case-file aesthetic: evidentiary, precise, not a SaaS dashboard.
+   Fonts fall back to system stacks if Google Fonts can't load —
+   this is a local dev tool, not something to leave broken offline.
+=========================================================== */
+:root {
+  --ink-950: #0a0f1a;
+  --ink-900: #111827;
+  --ink-850: #161e2f;
+  --ink-800: #1b2438;
+  --ink-700: #26314a;
+  --line: #232d42;
+
+  --paper: #ede8dd;
+  --paper-dim: #a8a394;
+  --paper-faint: #6b7280;
+
+  --brass: #c9973f;
+  --brass-dim: #8a6a2e;
+  --brass-wash: rgba(201, 151, 63, 0.12);
+
+  --teal: #4fa694;
+  --teal-wash: rgba(79, 166, 148, 0.14);
+
+  --brick: #b3554a;
+  --brick-wash: rgba(179, 85, 74, 0.14);
+
+  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--ink-950);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* ---------- shell ---------- */
+.app { max-width: 1440px; margin: 0 auto; padding: 2rem 1.75rem 4rem; }
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1rem;
+  margin-bottom: 1.75rem;
+}
+.masthead-title {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--paper);
+  margin: 0;
+}
+.masthead-title em {
+  font-style: italic;
+  color: var(--brass);
+  font-weight: 400;
+}
+.masthead-sub {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+main {
+  display: grid;
+  grid-template-columns: minmax(340px, 420px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 920px) {
+  main { grid-template-columns: 1fr; }
+}
+
+.pane {
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.pane-head h2 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--paper);
+}
+.pane-count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--paper-faint);
+}
+
+/* ---------- queue (folder-tab list) ---------- */
+.queue-list { list-style: none; margin: 0; padding: 0; max-height: 78vh; overflow-y: auto; }
+.queue-row {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.65rem 1.1rem;
+  border-bottom: 1px solid var(--ink-850);
+  cursor: pointer;
+  position: relative;
+  transition: background 120ms ease;
+}
+.queue-row:hover { background: var(--ink-850); }
+.queue-row.selected {
+  background: var(--ink-800);
+}
+.queue-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--brass);
+}
+.queue-tab {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--brass);
+  letter-spacing: 0.01em;
+}
+/* queue-info is a flex column so the rule and reason stack. Both children
+   must be block-level: text-overflow/ellipsis has no effect on an inline
+   element, which is what caused the reason text to run inline into the
+   amount column. min-width:0 lets the 1fr grid track actually shrink. */
+.queue-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow: hidden;
+}
+.queue-rule {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.queue-reason {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--paper-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.queue-amount {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--paper-dim);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---------- rubber stamps ---------- */
+.stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.55rem;
+  border: 1.5px dashed currentColor;
+  border-radius: var(--radius);
+  transform: rotate(-2deg);
+}
+.stamp.ready { color: var(--teal); background: var(--teal-wash); }
+.stamp.refused { color: var(--brick); background: var(--brick-wash); }
+.stamp.closed { color: var(--paper-faint); background: rgba(168, 163, 148, 0.08); }
+.stamp.triaged, .stamp.drafted, .stamp.evidenced, .stamp.loaded {
+  color: var(--brass); background: var(--brass-wash);
+}
+
+/* ---------- detail pane ---------- */
+.detail-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.detail-toolbar h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  margin: 0;
+}
+.detail-toolbar .spacer { flex: 1; }
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background: var(--brass);
+  color: var(--ink-950);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 120ms ease;
+}
+.btn:hover { background: #dcac54; }
+.btn:disabled { background: var(--ink-700); color: var(--paper-faint); cursor: wait; }
+.btn.ghost {
+  background: transparent;
+  color: var(--paper-dim);
+  border: 1px solid var(--line);
+}
+.btn.ghost:hover { border-color: var(--paper-faint); color: var(--paper); }
+
+.body { padding: 1.1rem; }
+
+.callout {
+  border-left: 3px solid var(--brick);
+  background: var(--brick-wash);
+  color: var(--paper);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.82rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin-bottom: 1rem;
+}
+.callout-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brick);
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+}
+
+/* ---------- narrative / exhibit citations ---------- */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin: 0 0 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.coverage-readout {
+  font-family: var(--font-mono);
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.68rem;
+}
+.coverage-readout.ok { color: var(--teal); background: var(--teal-wash); }
+.coverage-readout.low { color: var(--brick); background: var(--brick-wash); }
+
+.narrative-body {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--paper);
+  background: var(--ink-850);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin: 0 0 1.5rem;
+}
+.exhibit {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--brass);
+  background: var(--brass-wash);
+  border: 1px solid var(--brass-dim);
+  border-radius: 2px;
+  padding: 0 0.3rem;
+  cursor: default;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.exhibit.active {
+  background: var(--brass);
+  color: var(--ink-950);
+  box-shadow: 0 0 0 2px var(--brass-wash);
+}
+
+.cost-strip {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--paper-faint);
+  margin-bottom: 1.25rem;
+}
+
+/* ---------- evidence ledger (index cards) ---------- */
+.ledger { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.ledger-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px 90px 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.55rem 0.8rem 0.55rem 1rem;
+  border-bottom: 1px solid var(--ink-850);
+  font-size: 0.8rem;
+}
+.ledger-card.lit {
+  background: var(--brass-wash);
+}
+.ledger-card.lit::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--brass);
+}
+.ledger-fact-id { font-family: var(--font-mono); color: var(--brass); font-size: 0.74rem; }
+.ledger-kind {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+.ledger-summary { color: var(--paper-dim); line-height: 1.45; }
+
+/* ---------- review sign-off ---------- */
+.signoff {
+  border-top: 1px solid var(--line);
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.signoff select {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: var(--ink-850);
+  color: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.6rem;
+}
+.signoff-msg {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--teal);
+}
+
+/* ---------- evidence-only empty state ---------- */
+.hint {
+  font-size: 0.82rem;
+  color: var(--paper-faint);
+  font-style: italic;
+}
+
+/* ---------- api-down ---------- */
+.api-down {
+  text-align: center;
+  padding: 5rem 2rem;
+  font-family: var(--font-display);
+}
+.api-down code {
+  font-family: var(--font-mono);
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  display: inline-block;
+  margin-top: 0.75rem;
+}
+
+/* ---------- entrance ---------- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+main .pane { animation: rise 340ms ease-out both; }
+main .pane:nth-child(2) { animation-delay: 60ms; }
+
+/* ===========================================================
+   Explanatory layer — added so a first-time viewer understands
+   the system without a narrator. Persona A (investigators) can
+   collapse the primer and ignore the ⓘ marks entirely.
+=========================================================== */
+
+.masthead { align-items: flex-start; }
+.masthead-controls { display: flex; align-items: center; gap: 0.85rem; }
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 1.55rem; font-weight: 600; margin: 0; letter-spacing: -0.01em;
+}
+.wordmark em { font-style: italic; color: var(--brass); font-weight: 400; }
+.tagline {
+  font-family: var(--font-display);
+  font-style: italic; font-size: 0.92rem; color: var(--paper-dim);
+  margin: 0.25rem 0 0;
+}
+.btn.sm { padding: 0.35rem 0.65rem; font-size: 0.7rem; }
+.toggle {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--paper-dim); cursor: pointer; user-select: none;
+}
+.toggle input { accent-color: var(--brass); cursor: pointer; }
+
+/* ---------- primer ---------- */
+.primer {
+  background: var(--ink-900);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brass);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1.5rem;
+}
+.primer-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+.primer h3 {
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--brass); margin: 0 0 0.45rem;
+}
+.primer p { margin: 0; font-size: 0.86rem; line-height: 1.6; color: var(--paper-dim); }
+.primer strong { color: var(--paper); font-weight: 600; }
+.primer-stats {
+  display: flex; flex-wrap: wrap; gap: 1.4rem;
+  margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--paper-faint);
+}
+.primer-stats strong { color: var(--brass); font-weight: 600; }
+.primer-synthetic {
+  margin-left: auto; color: var(--brick);
+  border: 1px dashed var(--brick); border-radius: var(--radius);
+  padding: 0.1rem 0.5rem; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.primer-how {
+  margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line);
+  font-size: 0.84rem; color: var(--paper-dim); line-height: 1.6;
+}
+.exhibit.inline { padding: 0 0.25rem; font-size: 0.74rem; }
+
+/* ---------- glossary term ---------- */
+.term-wrap { position: relative; display: inline; }
+.term {
+  background: none; border: none; padding: 0; cursor: help;
+  color: var(--brass); font: inherit;
+  border-bottom: 1px dotted var(--brass-dim);
+}
+.term-mark { font-size: 0.62em; vertical-align: super; margin-left: 1px; opacity: 0.7; }
+.term-pop {
+  position: absolute; left: 0; top: 1.6em; z-index: 40;
+  width: min(320px, 74vw);
+  background: var(--ink-800); border: 1px solid var(--brass-dim);
+  border-radius: var(--radius); padding: 0.7rem 0.8rem;
+  font-family: var(--font-body); font-size: 0.78rem; line-height: 1.55;
+  color: var(--paper); box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  display: block; font-weight: 400;
+}
+.term-close {
+  display: block; margin-top: 0.5rem; background: none; border: none;
+  color: var(--paper-faint); font-family: var(--font-mono);
+  font-size: 0.66rem; cursor: pointer; padding: 0;
+}
+
+/* ---------- pipeline ---------- */
+.pipeline {
+  display: flex; align-items: center; gap: 0;
+  padding: 0.9rem 1.1rem 0.4rem;
+  border-bottom: 1px solid var(--ink-850);
+  overflow-x: auto;
+}
+.stage {
+  flex: 1; min-width: 74px; position: relative;
+  background: none; border: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  padding: 0.2rem 0;
+}
+.stage::after {
+  content: ''; position: absolute; top: 6px; left: 50%; right: -50%;
+  height: 1px; background: var(--ink-700);
+}
+.stage:last-child::after { display: none; }
+.stage.done::after { background: var(--brass-dim); }
+.stage-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid var(--ink-700); background: var(--ink-900);
+  position: relative; z-index: 2; transition: all 200ms ease;
+}
+.stage.done .stage-dot { border-color: var(--brass); background: var(--brass); }
+.stage.active .stage-dot {
+  border-color: var(--brass); background: var(--ink-900);
+  animation: pulse 900ms ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,151,63,0.55); }
+  50% { box-shadow: 0 0 0 6px rgba(201,151,63,0); }
+}
+.stage.picked .stage-dot { box-shadow: 0 0 0 3px var(--brass-wash); }
+.stage-label {
+  font-family: var(--font-mono); font-size: 0.66rem;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--paper-faint); white-space: nowrap;
+}
+.stage.done .stage-label, .stage.active .stage-label { color: var(--paper); }
+.stage.picked .stage-label { color: var(--brass); }
+
+.stage-detail {
+  padding: 0.7rem 1.1rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.84rem; line-height: 1.6; color: var(--paper-dim);
+  min-height: 3.6rem;
+}
+.stage-detail p { margin: 0; }
+.stage-detail strong { color: var(--paper); }
+.stage-detail em { color: var(--brass); font-style: italic; }
+.stage-detail .muted { color: var(--paper-faint); }
+
+/* ---------- detail head ---------- */
+.detail-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; padding: 0.95rem 1.1rem; border-bottom: 1px solid var(--line);
+}
+.detail-head h2 { font-family: var(--font-display); font-size: 1.2rem; margin: 0; }
+.detail-sub {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--paper-faint); margin: 0.2rem 0 0;
+}
+.btn.primary { background: var(--brass); color: var(--ink-950); font-weight: 600; }
+.btn.primary:hover { background: #dcac54; }
+
+/* ---------- queue additions ---------- */
+.queue-list li { list-style: none; }
+.queue-row {
+  width: 100%; text-align: left; background: none; border: none;
+  font: inherit; color: inherit;
+}
+.queue-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;
+  flex-shrink: 0; white-space: nowrap; padding-left: 0.5rem;
+}
+.truth {
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 0.05rem 0.35rem; border-radius: 2px;
+}
+.truth.real { color: var(--brick); background: var(--brick-wash); }
+.truth.noise { color: var(--paper-faint); background: rgba(168,163,148,0.08); }
+
+/* ---------- truth reveal ---------- */
+.truth-reveal {
+  border: 1px dashed; border-radius: var(--radius);
+  padding: 0.7rem 0.9rem; margin-bottom: 1rem;
+  font-size: 0.83rem; line-height: 1.55;
+}
+.truth-reveal.real { border-color: var(--brick); color: var(--paper); background: var(--brick-wash); }
+.truth-reveal.noise { border-color: var(--paper-faint); color: var(--paper-dim); }
+.truth-label {
+  display: block; font-family: var(--font-mono); font-size: 0.64rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--brass); margin-bottom: 0.3rem;
+}
+.truth-note {
+  display: block; margin-top: 0.4rem; font-size: 0.72rem;
+  color: var(--paper-faint); font-style: italic;
+}
+
+/* ---------- misc ---------- */
+.callout.error { border-left-color: var(--brick); }
+.ledger-legend {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem;
+}
+.legend-chip {
+  font-family: var(--font-mono); font-size: 0.62rem;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--paper-faint); background: var(--ink-850);
+  border: 1px solid var(--line); border-radius: 2px; padding: 0.12rem 0.4rem;
+}
+.frozen-tag {
+  font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--teal); background: var(--teal-wash);
+  padding: 0.1rem 0.4rem; border-radius: 2px;
+}
+.signoff-label {
+  font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--paper-faint); margin-right: 0.2rem;
+}
+.exhibit { font: inherit; font-family: var(--font-mono); }
+.down { text-align: center; padding: 5rem 2rem; font-family: var(--font-display); }
+.down code {
+  font-family: var(--font-mono); background: var(--ink-900);
+  border: 1px solid var(--line); padding: 0.25rem 0.6rem;
+  border-radius: var(--radius); font-size: 0.85rem;
+  display: inline-block; margin-top: 0.75rem;
+}

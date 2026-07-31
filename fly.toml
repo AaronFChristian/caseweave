@@ -1,0 +1,29 @@
+# Fly.io demo deployment target. NOT deployed by this build — deploying
+# requires a Fly account and `fly auth login`, which is a one-time manual
+# step. Once authenticated:
+#
+#   fly launch --no-deploy          # first time only, creates the app
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-...
+#   fly deploy
+#
+# Neo4j and Postgres are NOT run on Fly for the demo — point NEO4J_URI and
+# POSTGRES_DSN at Neo4j Aura (free tier) and Fly Postgres or Supabase
+# instead. DuckDB ships as a file inside the image, rebuilt from the seed
+# at image-build time (see the `generate`/`ingest`/`score` RUN steps you'd
+# add to the Dockerfile for a fully self-contained demo image).
+
+app = "caseweave-demo"
+primary_region = "sjc"
+
+[build]
+
+[http_service]
+  internal_port = 8123
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

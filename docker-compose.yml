@@ -1,0 +1,79 @@
+name: caseweave
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: caseweave
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caseweave_dev}
+      POSTGRES_DB: caseweave
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caseweave -d caseweave"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-caseweave_dev}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports: ["7474:7474", "7687:7687"]
+    volumes: [neodata:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # Kafka API compatible, single binary. Kafka + Zookeeper would eat ~4GB on a
+  # laptop for no additional teaching value on this project.
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 1G
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:19092
+    ports: ["19092:19092", "9644:9644"]
+    volumes: [rpdata:/var/lib/redpanda/data]
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # ---- Day 2 / Day 3 services. Not started by default: `--profile full`.
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    profiles: [full]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-caseweave-dev}
+    volumes: ["./config/litellm.yaml:/app/config.yaml:ro"]
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports: ["4000:4000"]
+
+  langfuse:
+    image: langfuse/langfuse:2
+    profiles: [full]
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://caseweave:${POSTGRES_PASSWORD:-caseweave_dev}@postgres:5432/caseweave
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${LANGFUSE_SECRET:-dev-secret-change-me}
+      SALT: ${LANGFUSE_SALT:-dev-salt-change-me}
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:
+  neodata:
+  rpdata:

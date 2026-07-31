@@ -1,0 +1,53 @@
+# LiteLLM gateway. Every model call in CaseWeave goes through this proxy —
+# no module imports the Anthropic SDK directly. One chokepoint gives one place
+# for cost control, version pinning, caching and a kill switch.
+# Day 2 wires the application to it; the file lives here from Day 1 so the
+# routing policy is reviewable alongside the architecture.
+
+model_list:
+  - model_name: triage
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      max_tokens: 2048
+
+  - model_name: extract
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      max_tokens: 4096
+
+  - model_name: narrative
+    litellm_params:
+      model: anthropic/claude-sonnet-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      max_tokens: 8192
+      # claude-sonnet-5 rejects `temperature` outright. Do not set it here.
+
+  - model_name: judge
+    litellm_params:
+      model: anthropic/claude-sonnet-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      max_tokens: 4096
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 3
+  timeout: 120
+  allowed_fails: 3
+  cooldown_time: 30
+
+litellm_settings:
+  drop_params: false          # fail loudly on an unsupported param, never silently
+  set_verbose: false
+  cache: true
+  cache_params:
+    type: local
+    ttl: 3600
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  max_budget: 40                # hard USD ceiling for the whole build
+  budget_duration: 30d
