@@ -144,9 +144,9 @@ flowchart TB
     LADDER --> SUP
     GH -.validates.-> SUP
 
-    style L9 fill:#3a1a1a,stroke:#a33
-    style L12 fill:#1a2e1a,stroke:#3a3
-    style L4 fill:#1a2e1a,stroke:#3a3
+    style L9 fill:#f8d7da,stroke:#842029,color:#000
+    style L12 fill:#d1e7dd,stroke:#0f5132,color:#000
+    style L4 fill:#d1e7dd,stroke:#0f5132,color:#000
 ```
 
 | # | Layer | Implementation | Status |
@@ -190,10 +190,10 @@ flowchart TD
     L -->|pass ≥90%| M[ready_for_review<br/>human decides]
     L -->|fail| N[refused<br/>evidence-gap report]
 
-    style Z1 fill:#2a2a1a,stroke:#aa3
-    style G fill:#1a2e1a,stroke:#3a3
-    style N fill:#3a1a1a,stroke:#a33
-    style M fill:#1a2e2e,stroke:#3aa
+    style Z1 fill:#fff3cd,stroke:#997404,color:#000
+    style G fill:#d1e7dd,stroke:#0f5132,color:#000
+    style N fill:#f8d7da,stroke:#842029,color:#000
+    style M fill:#cff4fc,stroke:#055160,color:#000
 ```
 
 A real, pre-existing bug was caught building this: the graph used to auto-close every
