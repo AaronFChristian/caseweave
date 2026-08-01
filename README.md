@@ -1,368 +1,306 @@
-# CaseWeave
+# ManimatedAI — README
 
-An agentic AML investigation copilot. It triages transaction-monitoring alerts,
-assembles an evidence packet from a transaction knowledge graph, and drafts a
-suspicious activity report narrative in which every assertion traces back to a
-specific transaction, account record, or regulatory clause — with a configurable
-human-in-the-loop autonomy ladder.
+**AI-Powered Educational Animation Generator**
+MIS 790 Culminating Experience | San Diego State University
 
-> **All data in this repository is synthetic.** No real customer transactions,
-> no real borrower financials, no real filings. The generator produces the
-> entire population from a fixed seed. This is a portfolio system for
-> demonstrating architecture and evaluation design. It is **not** validated
-> compliance software and must not be used to prepare an actual regulatory
-> filing.
+ManimatedAI takes a plain-English topic prompt (e.g. *"What is a Linear Transformation?"*) and automatically generates a fully narrated, multi-scene educational animation video using a 10-node LangGraph pipeline.
 
 ---
 
-## The design thesis
+## Table of Contents
 
-A SAR narrative is a legal document submitted to a federal regulator. A
-hallucinated sentence is not a bad user experience — it is a false statement to
-FinCEN. So the architecture inverts the usual pattern:
-
-> **Evidence is deterministic. Only the prose is probabilistic.**
-
-The language model never touches a database. It receives a frozen
-`EvidenceLedger` in which every fact carries an ID, and it may only write
-sentences that cite those IDs. A validator checks each sentence for a valid
-citation and runs an entailment check that the cited fact actually supports the
-claim. Sentences that fail are suppressed and surfaced to the reviewer, never
-silently passed through. Below a coverage threshold the system refuses to draft
-at all and returns an evidence-gap report instead.
+1. [System Requirements](#1-system-requirements)
+2. [Project Structure](#2-project-structure)
+3. [Step-by-Step Setup](#3-step-by-step-setup)
+   - [Step 1 — Clone or Download the Project](#step-1--clone-or-download-the-project)
+   - [Step 2 — Create a Python Virtual Environment](#step-2--create-a-python-virtual-environment)
+   - [Step 3 — Install All Dependencies](#step-3--install-all-dependencies)
+   - [Step 4 — Set Up Your API Keys (.env file)](#step-4--set-up-your-api-keys-env-file)
+   - [Step 5 — Download Kokoro TTS Model Files](#step-5--download-kokoro-tts-model-files)
+4. [Running the System](#4-running-the-system)
+   - [Option A — Command Line (Headless)](#option-a--command-line-headless)
+   - [Option B — Full Stack (Backend + Frontend)](#option-b--full-stack-backend--frontend)
+5. [Output Files](#5-output-files)
+6. [Troubleshooting](#6-troubleshooting)
 
 ---
 
-## Status
+## 1. System Requirements
 
-| Day | Scope | State |
+Before you begin, make sure your machine has the following installed:
+
+| Requirement | Version | Why It's Needed |
 |---|---|---|
-| 1 | Data plane: synthetic stream, knowledge graph, entity resolution, rule pack, regulatory corpus | ✅ complete |
-| 2 | Agent graph, evidence ledger, attributed narrative, guardrail pipeline | ✅ complete |
-| 3 | Golden-set evals, CI gate, MCP server, review console, deploy config | ✅ complete |
+| **Python** | 3.11 or 3.12 | Runtime for all pipeline code |
+| **FFmpeg** | Any recent version | Manim uses it to stitch scene videos together |
+| **LaTeX** (MiKTeX or TeX Live) | Any recent version | Manim uses it to render math equations |
+| **Git** | Any version | For cloning the repository |
+
+**How to install FFmpeg:**
+- macOS: `brew install ffmpeg`
+- Ubuntu/Debian: `sudo apt install ffmpeg`
+- Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
+
+**How to install LaTeX:**
+- macOS: Install [MacTeX](https://tug.org/mactex/)
+- Ubuntu/Debian: `sudo apt install texlive-full`
+- Windows: Install [MiKTeX](https://miktex.org/download)
 
 ---
 
-## Quickstart
-
-Requires Docker, and [uv](https://docs.astral.sh/uv/).
-
-```bash
-cp .env.example .env
-make setup          # deps + pre-commit hooks
-make day1           # infra up, generate, ingest, score, corpus, verify
-```
-
-`make day1` runs the whole Day 1 pipeline and finishes on the acceptance gate.
-Individual stages:
-
-```bash
-make up             # postgres+pgvector, neo4j, redpanda
-make topics         # create the transaction topic and its DLQ
-make generate       # synthetic entities + transactions -> parquet
-make ingest         # parquet -> Redpanda -> DuckDB + Neo4j
-make score          # River anomaly scoring + rule pack -> alert queue
-make corpus         # chunk + embed the regulatory corpus into pgvector
-make verify-day1    # acceptance gate
-```
-
-Iterating on the rules? Skip the slow parts:
-
-```bash
-make ingest-direct  # bypass Redpanda
-make score
-```
-
----
-
-## Day 1 output
-
-From seed `20260729`:
+## 2. Project Structure
 
 ```
-252 parties  ·  325 accounts  ·  8,645 transactions over 60 days
-12/12 planted duplicate identities resolved
-42 alerts  ·  11 true positives  ·  73.8% false-positive rate
-5/5 typologies surfaced  ·  planted-subject recall 10/11 (11/11 with Neo4j)
-43 regulatory chunks embedded
-```
-
-The false-positive rate is deliberate. Published analysis puts real
-transaction-monitoring false positives in the ninety to ninety-five percent
-range, so the generator plants benign near-misses — a restaurant banking real
-cash, a landlord passing rent through to a mortgage, a rotating savings pool —
-alongside the true typologies. A clean alert queue would make every downstream
-precision number meaningless.
-
-### Detection rules
-
-| Code | Typology | Store |
-|---|---|---|
-| R001 | Structuring / CTR avoidance | DuckDB |
-| R002 | Rapid pass-through of funds | DuckDB |
-| R003 | Fan-in from unrelated senders | DuckDB |
-| R004 | Dormant account reactivation | DuckDB |
-| R005 | High-risk jurisdiction corridor | DuckDB |
-| R006 | Circular fund flow (layering ring) | **Neo4j** |
-
-R006 is the interesting one. The originator of a laundering ring sends on the
-first hop and receives on the last, so it never presents the
-inbound-then-outbound signature the pass-through rule looks for. No amount of
-SQL tuning finds it — it is only visible as a closed path in the graph. That
-asymmetry is the concrete justification for the graph layer, and
-`planted-subject recall` drops from 11/11 to 10/11 when Neo4j is unavailable.
-
----
-
-## Day 2
-
-The agent graph: alert -> triage -> evidence gathering -> attribution-conditioned
-narrative -> guardrail gate. Six modules, wired with LangGraph:
-
-```
-llm/gateway.py       single chokepoint for every model call — in-process
-                      router (see "gateway architecture" below), task-based
-                      routing, on-disk response cache, cost ledger
-llm/ledger.py         the EvidenceLedger: frozen, ID-bearing fact store
-agents/tools.py       the only code that writes Facts — DuckDB, Neo4j, pgvector
-agents/triage.py      Haiku classification, structured verdict
-agents/narrative.py   Sonnet drafting, ledger-only prompt, citation extraction
-agents/graph.py       the LangGraph supervisor and all six nodes
-guardrails/injection.py    pattern-based memo scanner, defense-in-depth wrapper
-guardrails/attribution.py  sentence-level citation + LLM-judge entailment check
-guardrails/compliance.py   legal-conclusion language filter
-```
-
-**The core invariant**, checked by `tests/test_graph_mocked.py`: every fact ID
-cited in a narrative existed in the ledger *before* generation began, because
-the ledger is frozen (`ledger.freeze()`) prior to the narrative call. A
-narrative under `GATE_MIN_ATTRIBUTION_COVERAGE` (90%) is refused, not
-softened — see `guardrails/attribution.build_refusal`.
-
-**Gateway architecture.** `llm/gateway.py` is an in-process Python router,
-not a standalone LiteLLM proxy container. Same governance story — one
-chokepoint, task-based routing, caching, cost tracking, no direct SDK calls
-elsewhere in the codebase — without an extra container on a laptop. The
-equivalent standalone routing policy is documented in `config/litellm.yaml`
-for reference; switching to it later is a `base_url` change in
-`llm/gateway.py`, not an architecture change.
-
-**Testing without spending API budget.** `tests/test_graph_mocked.py` patches
-the gateway with canned responses and runs the full LangGraph wiring — this
-is what CI runs, and what `make verify-day2` checks. `scripts/run_case.py`
-is separate and deliberate: it requires `ANTHROPIC_API_KEY` explicitly and
-is never invoked by CI or the gate. Run it by hand when you want to confirm
-live model behaviour matches what the mocks assert.
-
-```bash
-make verify-day2                          # offline, free
-export ANTHROPIC_API_KEY=sk-ant-...
-uv run python scripts/run_case.py         # live, ~$0.02-0.05 per case
-```
-
-## Day 3
-
-Golden-set evals, a CI gate that can actually fail, an MCP server, a review
-console, and deploy configuration.
-
-### Golden set and eval harness
-
-`data/golden_set.json` is derived from the SAME ground-truth typology labels
-the Day 1 generator plants — not hand-written reference narratives, which
-for a portfolio project would take longer to write than everything else in
-the repo combined. What's hand-designed is the **eval contract**: five
-metrics per case (`src/caseweave/eval/metrics.py`), including one with zero
-tolerance — `no_false_clearance` — which fails if a true-positive alert is
-silently closed with no narrative and no evidence-gap report. A missed
-filing is the one failure mode worse than an over-cautious refusal.
-
-```bash
-make golden-set     # rebuild data/golden_set.json from current DuckDB alerts
-make evals           # backtest in mock mode — free, this is what CI runs
-make evals-live       # backtest against the real API — spends money
-```
-
-**Honest caveat, printed by the tool itself every run**: mock-mode evals
-prove the graph/ledger/guardrail *wiring* is correct — the mock model always
-cooperates, so a 100% mock pass rate is a plumbing signal, not a quality
-signal. `tests/test_eval_harness.py` proves each metric can genuinely fail
-(deliberately feeding it bad state), so the gate has real teeth even though
-tonight's full-corpus run happened to be clean:
-
-```
-30 cases, 30 passed (100.0%)
-mean attribution coverage: 1.0
-mean latency: 28.6 ms (mock)
-```
-
-### CI eval gate
-
-`.github/workflows/ci.yml` runs `build_golden_set.py` + `run_evals.py
---fail-under 0.80` on every push/PR, in mock mode — a PR that breaks the
-graph wiring or a guardrail can't merge. A commented-out `live-evals` job
-sketches the honest path to a real quality gate: manually-triggered or
-nightly, using a repo secret, separate from the PR-blocking mock gate. Live
-model quality on every commit isn't something to spend money on
-unconditionally.
-
-### MCP server
-
-```bash
-make mcp
-```
-
-Five read-only tools (`list_alerts`, `get_alert`, `get_case_evidence`,
-`search_typology`, `get_queue_summary`) exposed via `FastMCP`, addable to
-Claude Desktop's config. Deliberately read-only — `get_case_evidence`
-assembles the evidence ledger without ever calling the narrative model,
-proven by `tests/test_mcp_tools.py::test_get_case_evidence_does_not_call_narrative_model`,
-which patches the gateway to raise if it's ever invoked. Any write
-(disposition, approval) requires a session-scoped console request, never an
-MCP call — see `src/caseweave/api/main.py`'s module docstring for the
-boundary.
-
-Business logic (`mcp_server/tool_logic.py`) is dependency-free from the MCP
-SDK and tested with plain pytest; the server file (`mcp_server/server.py`)
-is a thin decorator wrapper only responsible for protocol wiring.
-
-### Review console
-
-```bash
-make api        # FastAPI backend, :8123
-make console     # React console, :5173 (separate terminal)
-```
-
-Queue pane, case detail, and a narrative view where citation markers
-(`[F-001]`) are hoverable spans that highlight the corresponding evidence
-fact — the attribution architecture made visible. "Run full case" is a
-separate, explicit button, never triggered by page load or alert selection,
-so browsing the queue never spends tokens. Approve/Edit/Reject are gated on
-a reason code from a controlled vocabulary (`GET /reason-codes`) — no
-free-text reasons.
-
-Every API endpoint was tested live against real DuckDB data while building
-this (health check, list/detail/evidence, valid and invalid disposition
-submission, 404 on unknown alert); the frontend build was verified with a
-real `vite build` (zero errors) and served with `vite preview`. Full
-browser-rendered click-through has not been done by an automated agent —
-worth doing yourself before a live demo.
-
-### Deploy
-
-`Dockerfile` (multi-stage, non-root, pinned deps) and `fly.toml` document
-the deploy target. **Not deployed** — that requires a Fly.io account and
-`fly auth login`, a manual one-time step. Once authenticated:
-
-```bash
-fly launch --no-deploy
-fly secrets set ANTHROPIC_API_KEY=sk-ant-...
-fly deploy
-```
-
-Point `NEO4J_URI` at Neo4j Aura's free tier and `POSTGRES_DSN` at Fly
-Postgres or Supabase rather than running either in the demo container.
-
-## Architecture
-
-```
-Users & channels    React console · FastAPI · FastMCP · webhook · Slack
-Orchestration       LangGraph supervisor + 6 sub-agents, Postgres checkpointer
-Tools               parameterised Cypher · DuckDB analytics · hybrid retrieval
-Context & memory    Neo4j graph · pgvector corpus · prior dispositions
-Guardrails          injection · PII · attribution validator · compliance filter
-LLM gateway         LiteLLM proxy — routing, caching, quotas, versioning
-Models              Haiku 4.5 (triage/extract) · Sonnet 5 (narrative/judge)
-Observability       Langfuse · Prometheus · DeepEval + RAGAS golden set
-Security            OIDC · RBAC/ABAC · per-agent credentials · hash-chained audit
-Infrastructure      Docker Compose local · Fly.io demo · Terraform AWS target
-Delivery            ruff · mypy · pytest · bandit · trivy · eval gate
-Human in the loop   L0–L4 autonomy ladder, LangGraph interrupts, reason codes
-```
-
-Two design rules that everything else follows from:
-
-**The model never authors a query.** Every Cypher statement lives in
-`CYPHER_TEMPLATES` as a fixed parameterised string. The agent selects a template
-by name and supplies parameters. That closes the injection path and makes every
-query a reviewable artifact rather than a model output.
-
-**No module imports the Anthropic SDK.** All model traffic goes through the
-LiteLLM proxy, so cost control, version pinning, caching and the kill switch
-live in exactly one place.
-
----
-
-## Repository layout
-
-```
-src/caseweave/
-  config.py            every tunable, every threshold, every model string
-  models.py            Pydantic domain contracts
-  generator/           synthetic population and transaction stream
-  ingest/              Redpanda producer/consumer, entity resolution
-  scoring/             River online anomaly scoring, deterministic rule pack
-  db/                  DuckDB analytics store, Neo4j graph + Cypher templates
-  corpus/              heading-aware chunker, pgvector loader
-  llm/                 gateway (in-process router), EvidenceLedger
-  agents/              triage, evidence tools, narrative, LangGraph supervisor
-  guardrails/          injection scanner, attribution validator, compliance filter
-  eval/                golden-set builder, metrics, backtest harness
-  mcp_server/          FastMCP server + dependency-free tool logic
-  api/                 FastAPI backend for the review console
-scripts/
-  pipeline.py          generate | ingest | score | all
-  verify_day1.py       Day 1 acceptance gate
-  verify_day2.py       Day 2 acceptance gate (offline)
-  build_golden_set.py  derive data/golden_set.json from DuckDB
-  run_evals.py         golden-set backtest, mock or --live
-  run_case.py          run one case against the real API
-  check_tree.py        structural integrity check — run after any extraction
-data/regulatory/        typology and narrative-guidance corpus
-console/                 React + Vite review console
-config/litellm.yaml     reference standalone gateway routing policy
-Dockerfile, fly.toml     deploy target (documented, not deployed)
+MIS790/
+├── main.py                  ← CLI entry point (run to generate a video)
+├── setup_kokoro.py          ← Downloads Kokoro TTS model files (run once)
+├── requirements.txt         ← All Python dependencies
+├── .env                     ← Your API keys (you create this — see Step 4)
+│
+├── src/
+│   ├── orchestrator/        ← 10-node LangGraph pipeline (N1–N10)
+│   ├── rag/                 ← Retrieval-Augmented Generation (RAG) modules
+│   ├── core/                ← Ledger, layout engine, artifacts, job tracking
+│   ├── backend/             ← FastAPI REST API server
+│   ├── app/                 ← Streamlit frontend UI
+│   ├── agent/               ← Critic and agent logic
+│   ├── tools/               ← Manim sandbox and safety checker
+│   └── common/              ← Shared settings, LLM client, types
+│
+├── prompts/                 ← LLM system prompts and code patterns
+├── corpus/
+│   ├── textbooks/           ← Reference text used by the RAG system
+│   └── manim_examples/      ← Reference Manim code used by the RAG system
+│
+└── out/
+    └── jobs/                ← Output folder (created automatically on first run)
+        └── <job_id>/        ← All artifacts for each video job
 ```
 
 ---
 
-## Known limitations
+## 3. Step-by-Step Setup
 
-Stated here rather than discovered by a reviewer:
+### Step 1 — Clone or Download the Project
 
-- **DuckDB takes a global write lock.** Single-writer by design. Correct for
-  batch scoring and a demo, not a pattern to carry into a concurrent service.
-- **The shipped corpus is original prose**, not primary source text, so the
-  repository is self-contained and reproducible offline. Run
-  `scripts/fetch_primary_sources.py` for the real advisories before any demo
-  where citation fidelity matters.
-- **Entity resolution is deterministic blocking**, not probabilistic matching.
-  Will miss transliteration variants; the tradeoff is that "same DOB, same
-  surname, same registered address" is a better answer to an examiner than
-  a similarity score.
-- **The attribution judge is Haiku, not a downloaded NLI model.** A
-  deliberate resource tradeoff — no ~500MB download, a different task class
-  from the generator so a systematic bias doesn't pass its own check.
-  Swapping in a local cross-encoder is a drop-in replacement for
-  `guardrails/attribution._entails()`.
-- **Mock-mode evals test wiring, not model quality.** See the Day 3 section
-  above — a 100% mock pass rate is a plumbing signal. Live evals are a
-  separate, manually-triggered, money-spending step by design.
-- **No authentication anywhere.** Neither the API nor the console has auth.
-  Do not expose either outside localhost.
-- **Dispositions are in-memory**, not persisted — the API's disposition
-  store resets on restart. A real deployment writes to the hash-chained
-  audit log the architecture describes, not a Python dict.
-- **The console's full browser click-through hasn't been visually verified**
-  by an automated agent — the API was tested live end-to-end and the
-  frontend build is clean, but do a manual pass before a live demo.
-- **Deploy is documented, not executed.** `fly deploy` requires your own
-  Fly.io account.
-- **Ground-truth labels (`gt_*`) exist only because the data is synthetic.**
-  They are stripped before anything reaches a model and exist solely to
-  build the golden set.
+If you have the zip file, extract it. If using Git:
+
+```bash
+git clone <repository-url>
+cd MIS790
+```
 
 ---
 
-## Licence
+### Step 2 — Create a Python Virtual Environment
 
-MIT. Synthetic data only.
+A virtual environment keeps all dependencies isolated from your system Python. **Do this inside the `MIS790` project folder.**
+
+**macOS / Linux:**
+```bash
+python3.11 -m venv venv
+source venv/bin/activate
+```
+
+**Windows (Command Prompt):**
+```cmd
+python -m venv venv
+venv\Scripts\activate
+```
+
+**Windows (PowerShell):**
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+You will know the environment is active when you see `(venv)` at the beginning of your terminal prompt.
+
+> ⚠️ **Important:** Every time you open a new terminal session, you must re-activate the virtual environment using the `source venv/bin/activate` (or `venv\Scripts\activate` on Windows) command before running any project commands.
+
+---
+
+### Step 3 — Install All Dependencies
+
+With the virtual environment active, install everything from `requirements.txt`:
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+This will install Manim, LangGraph, FastAPI, Streamlit, the Kokoro TTS engine, and all other required libraries. This step may take a few minutes on first run.
+
+---
+
+### Step 4 — Set Up Your API Keys (.env file)
+
+The system uses an LLM (Large Language Model) API to generate animation plans and code. You need at least **one** of the following API keys.
+
+Create a file named `.env` in the root of the project folder (same folder as `main.py`) and paste in the following template:
+
+```env
+# ─── LLM Provider ───────────────────────────────────────────
+# Set to "openai", "anthropic", or "deepseek"
+LLM_PROVIDER=openai
+
+# ─── API Keys — fill in at least ONE ────────────────────────
+OPENAI_API_KEY=your-openai-api-key-here
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
+
+# ─── Optional: Model Overrides ──────────────────────────────
+# Leave these commented out to use the defaults
+# OPENAI_MODEL=gpt-4o
+# ANTHROPIC_MODEL=claude-3-haiku-20240307
+# DEEPSEEK_MODEL=deepseek-chat
+
+# ─── Optional: Fallback Provider ────────────────────────────
+# If the primary provider fails, it will try this one next
+LLM_FALLBACK_PROVIDER=deepseek
+
+# ─── Optional: Pipeline Settings ────────────────────────────
+MAX_SCENES=8          # Maximum number of scenes per video (default: 8)
+LOG_LEVEL=INFO        # Log verbosity: DEBUG, INFO, WARNING, ERROR
+SANDBOX_ENABLED=true  # Validate each scene before rendering (recommended)
+SANDBOX_MAX_ATTEMPTS=3
+SANDBOX_TIMEOUT_S=45
+```
+
+> 🔒 **Never share or commit your `.env` file.** It contains private API keys. The `.gitignore` should already exclude it, but double-check before pushing to GitHub.
+
+---
+
+### Step 5 — Download Kokoro TTS Model Files
+
+ManimatedAI uses the **Kokoro** text-to-speech engine to add narration to animations. The model files are large (~90MB combined) and are **not included** in the repository — they must be downloaded separately.
+
+Run this script **once** from the project root:
+
+```bash
+python setup_kokoro.py
+```
+
+This will download two files into the project root directory:
+- `kokoro-v0_19.onnx` — the Kokoro voice model
+- `voices.bin` — the voice data file
+
+**Expected output:**
+```
+Downloading kokoro-v0_19.onnx...
+✅ Downloaded: kokoro-v0_19.onnx
+Downloading voices.bin...
+✅ Downloaded: voices.bin
+```
+
+If the files already exist, it will skip the download and print a checkmark. You only need to run this once.
+
+> ⚠️ **The system will not start without these two files.** If you skip this step, you will see a `FileNotFoundError` when running `main.py`.
+
+---
+
+## 4. Running the System
+
+### Option A — Command Line (Headless)
+
+The simplest way to run the full pipeline is directly from the command line:
+
+```bash
+python main.py --prompt "What is a Linear Transformation in Linear Algebra?"
+```
+
+**Additional options:**
+
+```bash
+# Limit the number of scenes generated
+python main.py --prompt "Your topic here" --max-scenes 5
+
+# Set video quality (low = 480p, medium = 720p, high = 1080p)
+python main.py --prompt "Your topic here" --quality medium
+
+# Use a specific job ID (useful for re-running or debugging)
+python main.py --prompt "Your topic here" --job-id myjob123
+```
+
+The output video and all intermediate files will be saved to:
+```
+out/jobs/<job_id>/final_video.mp4
+```
+
+---
+
+### Option B — Full Stack (Backend + Frontend)
+
+To use the web interface, you need to start **two processes** — the backend API and the Streamlit frontend. Open two separate terminal windows.
+
+**Terminal 1 — Start the FastAPI Backend:**
+```bash
+# Make sure virtual environment is active
+source venv/bin/activate  # (or venv\Scripts\activate on Windows)
+
+uvicorn src.backend.main:app --reload --port 8000
+```
+
+You should see:
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+**Terminal 2 — Start the Streamlit Frontend:**
+```bash
+# Make sure virtual environment is active
+source venv/bin/activate  # (or venv\Scripts\activate on Windows)
+
+streamlit run src/app/app.py
+```
+
+Streamlit will automatically open a browser tab at `http://localhost:8501`. If it doesn't, open it manually.
+
+> The backend must be running **before** you submit a job from the Streamlit interface.
+
+---
+
+## 5. Output Files
+
+Every run creates a folder under `out/jobs/<job_id>/` containing:
+
+| File | What it is |
+|---|---|
+| `final_video.mp4` | The complete rendered animation with narration |
+| `plan.json` | The animation plan generated by the planner (N3) |
+| `animation_descriptions.json` | Scene-by-scene descriptions (N4) |
+| `layout_specs.json` | Spatial layout guide for each scene (N5) |
+| `pseudocode.json` | JSON blueprint of animation objects and calls (N7) |
+| `scene_01_*.py` … `scene_N_*.py` | Generated Manim Python scene files (N8) |
+| `render_00_stdout.txt` … | Render logs for each scene (N10) |
+| `n9_fix_summary.json` | Summary of any auto-fix cycles applied (N9) |
+| `n10_render_summary.json` | Final render summary with success/failure per scene |
+| `ledger.json` | Cross-scene consistency ledger (colors, notation, objects) |
+| `job_journey.json` | Full audit trail of every pipeline step |
+| `input.json` | Original input prompt and job metadata |
+
+---
+
+## 6. Troubleshooting
+
+**`FileNotFoundError: Kokoro TTS model not found`**
+→ You skipped Step 5. Run `python setup_kokoro.py` from the project root.
+
+**`LLMClientError: OPENAI_API_KEY is not set`**
+→ You either didn't create a `.env` file or it's in the wrong folder. Make sure `.env` is in the same folder as `main.py`.
+
+**`ModuleNotFoundError: No module named 'manim'`**
+→ Your virtual environment is not active. Run `source venv/bin/activate` first.
+
+**Manim rendering fails with LaTeX errors**
+→ LaTeX is not installed. See the System Requirements section above.
+
+**FFmpeg not found**
+→ FFmpeg is not installed or not on your PATH. See the System Requirements section above.
+
+**Streamlit can't connect to backend**
+→ Make sure the FastAPI backend (`uvicorn`) is running in a separate terminal on port 8000 before submitting a job.
+
+---
+
+*For questions about the project, refer to the Final Report (Deliverable 5) or contact the project team.*
